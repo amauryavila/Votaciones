@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elecciones IE Jesus Maria Valle Jaramillo</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        #candidatos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            max-width: 800px;
+            margin: auto;
+        }
+        .candidato {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .candidato img {
+            width: 100%;
+            max-width: 150px;
+            height: auto;
+            border-radius: 10px;
+            object-fit: cover;
+        }
+        .candidato button {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            width: 100%;
+        }
+        .candidato button:hover {
+            background-color: #0056b3;
+        }
+        input, button {
+            padding: 10px;
+            margin: 10px;
+            font-size: 16px;
+        }
+        #resultados {
+            margin-top: 20px;
+        }
+        canvas {
+            max-width: 600px;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+    <h2>Autenticación</h2>
+    <label for="documento">Ingrese su número de documento:</label>
+    <input type="text" id="documento" placeholder="Número de documento">
+    <button onclick="validarDocumento()">Ingresar</button>
+
+    <div id="votacion" style="display:none;">
+        <h2>Elige tu candidato:</h2>
+        <div id="candidatos"></div>
+    </div>
+
+    <h2>Resultados de la votación</h2>
+    <button onclick="obtenerResultados()">Ver resultados</button>
+    <div id="resultados"></div>
+    <canvas id="graficoVotos"></canvas>
+
+    <script>
+        let votoRegistrado = false;
+        let documentoUsuario = "";
+        const scriptURL = "https://script.google.com/macros/s/AKfycbxySKQbrUHFkcncycmUfyMmLqSzqkUsGgsxTko9Jkhjzm7a-GSRQaMGbchsrkgeLdyzhw/exec"; // link validacion
+        const scriptURL = "https://script.google.com/macros/s/AKfycbz9NoE8UeejfNuXSLcpNscJqhrFv560dsUFms4hvUUQroCaXviVH75zClTz3_iKD-moIA/exec"; //link votar
+        const resultadosURL = "https://script.google.com/macros/s/AKfycbz9NoE8UeejfNuXSLcpNscJqhrFv560dsUFms4hvUUQroCaXviVH75zClTz3_iKD-moIA/exec";
+
+        const candidatos = [
+            { id: 1, nombre: "Candidato 1", imagen: "../images/c1.jpeg" },
+            { id: 2, nombre: "Candidato 2", imagen: "/images/c2.jpeg" },
+            { id: 3, nombre: "Candidato 3", imagen: "/images/c3.jpeg" },
+            { id: 4, nombre: "Candidato 4", imagen: "/images/c4.jpeg" },
+            { id: 5, nombre: "Candidato 5", imagen: "/images/p1.jpeg" },
+            { id: 6, nombre: "Candidato 6", imagen: "/images/p2.jpeg" },
+            { id: 7, nombre: "Candidato 7", imagen: "/images/p3.jpeg" },
+            { id: 8, nombre: "Candidato 8", imagen: "/images/p4.jpeg" }
+        ];
+
+        function validarDocumento() {
+        documentoUsuario = document.getElementById("documento").value;
+        if (!documentoUsuario) {
+            Swal.fire("Error", "Por favor, ingrese su número de documento.", "error");
+            return;
+        }
+
+        fetch(scriptURL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ documento: documentoUsuario })
+        })
+        .then(response => response.text())
+        .then(data => {
+            if (data === "VALIDO") {
+                Swal.fire("Acceso permitido", "Puede continuar con la votación.", "success");
+                document.getElementById("votacion").style.display = "block";
+                cargarCandidatos();
+            } else {
+                Swal.fire("Acceso denegado", "Este documento no pertenece a la institución.", "error");
+            }
+        })
+        .catch(error => console.error("Error:", error));
+    }
+
+        function votar(num) {
+            if (votoRegistrado || localStorage.getItem("yaVoto")) {
+                Swal.fire("Error", "Ya has votado y no puedes cambiar tu voto.", "error");
+                return;
+            }
+            Swal.fire({
+                title: `¿Confirmas tu voto por Candidato ${num}?`,
+                icon: "question",
+                showCancelButton: true,
+                confirmButtonText: "Sí, votar",
+                cancelButtonText: "Cancelar"
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    enviarVoto(num);
+                }
+            });
+        }
+
+        function enviarVoto(num) {
+            fetch(scriptURL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ documento: documentoUsuario, candidato: "Candidato " + num })
+            })
+            .then(response => response.text())
+            .then(data => {
+                if (data.includes("ERROR")) {
+                    Swal.fire("Error", "Este documento ya ha votado.", "error");
+                } else {
+                    votoRegistrado = true;
+                    localStorage.setItem("yaVoto", "true");
+                    document.getElementById("candidatos").innerHTML = `<p>Voto registrado.</p>`;
+                    Swal.fire("Voto registrado", "Tu voto ha sido registrado correctamente.", "success");
+                }
+            })
+            .catch(error => console.error("Error:", error));
+        }
+
+        function obtenerResultados() {
+            fetch(resultadosURL)
+                .then(response => response.json())
+                .then(data => {
+                    let labels = Object.keys(data);
+                    let valores = Object.values(data);
+                    
+                    let ctx = document.getElementById("graficoVotos").getContext("2d");
+                    new Chart(ctx, {
+                        type: "bar",
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: "Número de votos",
+                                data: valores,
+                                backgroundColor: "blue"
+                            }]
+                        }
+                    });
+
+                    document.getElementById("resultados").innerHTML = "<h3>Resultados actualizados</h3>";
+                })
+                .catch(error => console.error("Error al obtener los resultados:", error));
+        }
+
+        function cargarCandidatos() {
+            const candidatosDiv = document.getElementById("candidatos");
+            candidatosDiv.innerHTML = candidatos.map(c => `
+                <div class="candidato">
+                    <img src="${c.imagen}" alt="${c.nombre}">
+                    <button onclick="votar(${c.id})">Votar por ${c.nombre}</button>
+                </div>
+            `).join("");
+        }
+    </script>
+</body>
+</html>
